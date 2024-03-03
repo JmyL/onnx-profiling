@@ -1,0 +1,65 @@
+---
+title: Profile of ONNX
+format:
+  html:
+    code-fold: true
+jupyter: python3
+code:
+---
+
+```{python}
+import numpy
+import onnx
+import onnxruntime as rt
+from onnxruntime.datasets import get_example
+```
+
+```{python}
+with open(get_example("mul_1.onnx"), "rb") as f:
+    model = onnx.load(f)
+model_str = model.SerializeToString()
+
+options = rt.SessionOptions()
+options.enable_profiling = True
+sess = rt.InferenceSession(model_str, options, providers=rt.get_available_providers())
+input_name = sess.get_inputs()[0].name
+```
+
+```{python}
+x = numpy.array([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]], dtype=numpy.float32)
+res = sess.run(None, {input_name: x})
+print(res)
+prof_file = sess.end_profiling()
+print(prof_file)
+```
+
+Open `{python} prof_file` with `chrome://tracing` or `https://www.speedscope.app/`, or locally with npm package(`npm install speedscope && speedscope ./onnxruntime_profile...`)
+
+```{python}
+# dot = sess.to_dot()
+# # print(dot)
+# from jyquickhelper import RenderJsDot
+# RenderJsDot(dot)
+
+# !python net_drawer.py
+```
+
+```{python}
+from net_drawer import *
+pydot_graph = GetPydotGraph(
+    model.graph,
+    name=model.graph.name,
+    rankdir='TD',
+    node_producer=GetOpNodeProducer(
+        embed_docstring=True, **OP_STYLE
+    ),
+)
+pydot_graph.write_dot('output.dot')
+```
+
+```{dot}
+//| file: output.dot
+//| fig-height: 5
+//| output: True
+```
+
