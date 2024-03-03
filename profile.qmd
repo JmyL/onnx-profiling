@@ -7,14 +7,23 @@ jupyter: python3
 code:
 ---
 
+아래의 site들을 참고했습니다.
+
+- https://onnxruntime.ai/docs/performance/tune-performance/profiling-tools.html#in-code-performance-profiling
+- https://onnxruntime.ai/docs/api/python/auto_examples/plot_profiling.html
+- http://www.xavierdupre.fr/app/mlprodict/helpsphinx/notebooks/onnx_profile_ort.html
+
 ```{python}
 import numpy
 import onnx
 import onnxruntime as rt
-from onnxruntime.datasets import get_example
+import json
 ```
 
+Model을 정의합니다.
+
 ```{python}
+from onnxruntime.datasets import get_example
 with open(get_example("mul_1.onnx"), "rb") as f:
     model = onnx.load(f)
 model_str = model.SerializeToString()
@@ -25,24 +34,7 @@ sess = rt.InferenceSession(model_str, options, providers=rt.get_available_provid
 input_name = sess.get_inputs()[0].name
 ```
 
-```{python}
-x = numpy.array([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]], dtype=numpy.float32)
-res = sess.run(None, {input_name: x})
-print(res)
-prof_file = sess.end_profiling()
-print(prof_file)
-```
-
-Open `{python} prof_file` with `chrome://tracing` or `https://www.speedscope.app/`, or locally with npm package(`npm install speedscope && speedscope ./onnxruntime_profile...`)
-
-```{python}
-# dot = sess.to_dot()
-# # print(dot)
-# from jyquickhelper import RenderJsDot
-# RenderJsDot(dot)
-
-# !python net_drawer.py
-```
+Model graph는 다음과 같습니다.
 
 ```{python}
 from net_drawer import *
@@ -62,4 +54,28 @@ pydot_graph.write_dot('output.dot')
 //| fig-height: 5
 //| output: True
 ```
+
+Profiling 결과는 다음과 같습니다.
+
+```{python}
+x = numpy.array([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]], dtype=numpy.float32)
+res = sess.run(None, {input_name: x})
+prof_file = sess.end_profiling()
+```
+
+```{python}
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+df = pd.read_json(prof_file)
+kernel_df = df[df['name'].str.endswith('_kernel_time')]
+kernel_df['name'] = kernel_df['name'].str.replace('_kernel_time', '')
+sns.barplot(x='dur', y='name', data=kernel_df)
+plt.show()
+```
+
+상세한 profiling result는 아래의 방법으로 시각화하여 확인할 수 있습니다.
+
+Open `{python} prof_file` with `chrome://tracing` or `https://www.speedscope.app/`, or locally with npm package(`npm install speedscope && speedscope ./onnxruntime_profile...`)
 
